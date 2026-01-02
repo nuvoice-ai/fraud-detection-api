@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: NuVoice Fraud Detection API
+  version: "1.0.0"
+  description: >
+    Single-serving fraud/deepfake detection over audio.
+servers:
+  - url: https://fraud-api.nuvoice.ai
+
+paths:
+  /v1/fraud/detect:
+    post:
+      operationId: detectFraud
+      summary: Detect whether an audio sample is real vs fake
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectRequest"
+            examples:
+              mulaw_8khz:
+                summary: Twilio-style mu-law @ 8kHz
+                value:
+                  session_id: "call_123"
+                  audio:
+                    content: "BASE64_AUDIO_HERE"
+                    encoding: "mulaw"
+                    sample_rate_hz: 8000
+                    channels: 1
+                  options:
+                    return_scores: true
+      responses:
+        "200":
+          description: Detection result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectResponse"
+              examples:
+                ok:
+                  value:
+                    prediction: "real"
+                    confidence: 0.93
+                    request_id: "req_01HX9K..."
+                    processing_ms: 184
+                    scores:
+                      fake: 0.07
+                      real: 0.93
+        "400":
+          description: Invalid request (bad JSON, missing fields, invalid audio params)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing/invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: Payload too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    DetectRequest:
+      type: object
+      additionalProperties: false
+      required: [audio]
+      properties:
+        session_id:
+          type: string
+          description: Optional client-generated correlation id (e.g., Twilio CallSid).
+          minLength: 1
+          maxLength: 200
+        audio:
+          $ref: "#/components/schemas/AudioInput"
+        options:
+          type: object
+          additionalProperties: false
+          properties:
+            return_scores:
+              type: boolean
+              default: false
+              description: If true, return per-class probability scores in addition to prediction/confidence.
+            threshold:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: Optional override threshold for labeling fake vs real (model still returns raw scores).
+            calibration_profile:
+              type: string
+              description: Optional calibration profile name (e.g., "default", "bank_v1").
+
+    AudioInput:
+      type: object
+      additionalProperties: false
+      required: [content, encoding]
+      properties:
+        content:
+          type: string
+          description: Base64-encoded audio bytes (no data: prefix).
+          minLength: 1
+        encoding:
+          type: string
+          description: Audio encoding of the provided bytes.
+          enum: [mulaw, alaw, pcm_s16le, wav, mp3, opus]
+        sample_rate_hz:
+          type: integer
+          description: Sampling rate in Hz (required for raw formats like mulaw/pcm_s16le).
+          minimum: 8000
+          maximum: 48000
+        channels:
+          type: integer
+          description: Number of channels (1=mono, 2=stereo).
+          minimum: 1
+          maximum: 2
+
+    DetectResponse:
+      type: object
+      additionalProperties: false
+      required: [prediction, confidence, request_id]
+      properties:
+        prediction:
+          type: string
+          enum: [real, fake]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Confidence of the returned prediction (calibrated as best-effort).
+        request_id:
+          type: string
+          description: Server-generated id for debugging/support.
+        processing_ms:
+          type: integer
+          description: Server-side processing time in milliseconds.
+          minimum: 0
+        scores:
+          type: object
+          additionalProperties: false
+          description: Optional per-class scores/probabilities.
+          properties:
+            real:
+              type: number
+              minimum: 0
+              maximum: 1
+            fake:
+              type: number
+              minimum: 0
+              maximum: 1
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+            message:
+              type: string
+            request_id:
+              type: string
+              description: Present when available for debugging/support.
+            details:
+              type: object
+              description: Optional structured error details.
+              additionalProperties: true
