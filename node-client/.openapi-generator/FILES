@@ -1,0 +1,14 @@
+.gitignore
+.openapi-generator-ignore
+api.ts
+api/apis.ts
+api/defaultApi.ts
+git_push.sh
+model/audioInput.ts
+model/detectRequest.ts
+model/detectRequestOptions.ts
+model/detectResponse.ts
+model/detectResponseScores.ts
+model/errorResponse.ts
+model/errorResponseError.ts
+model/models.ts

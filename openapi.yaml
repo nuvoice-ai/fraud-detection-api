@@ -129,7 +129,7 @@ components:
       properties:
         content:
           type: string
-          description: Base64-encoded audio bytes (no data: prefix).
+          description: Base64-encoded audio bytes.
           minLength: 1
         encoding:
           type: string
