@@ -1,3 +1,5 @@
+*.html
+*.swp
 mock-server/
 # Logs
 logs
